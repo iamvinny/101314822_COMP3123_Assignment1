@@ -1,4 +1,6 @@
 const userSchema = require('../models/UsersModel.js');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
 module.exports = function(app){
 
@@ -58,10 +60,14 @@ module.exports = function(app){
             userSchema.findOne({username: req.body.username}, (err, user) => {
                 if (user) {
                     if (req.body.password === user.password) {
+                        const user = {name: req.body.username};
+                        const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET);
+
                         res.send({
                             status: true,
                             username: user.username,
-                            message: "User logged in successfully"
+                            message: "User logged in successfully",
+                            jwt_token: accessToken
                         });
                     } else {
                         res.status(400).send({

@@ -1,11 +1,25 @@
 const employeeSchema = require('../models/EmployeesModel.js');
+const jwt = require('jsonwebtoken');
+
+// Create middleware to authenticate the token
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1]
+    if (token == null) return res.sendStatus(401) // if there isn't any token
+
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user ) => {
+        if (err) return res.sendStatus(403)
+        req.user = user
+        next() // pass the execution off to whatever request the client intended
+    })
+}
 
 module.exports = function(app){
 
     /* +===================================================+ */
     /*           Get a list of all the employees             */
     /* +===================================================+ */
-    app.get('/api/emp/employees', (req, res) => {
+    app.get('/api/emp/employees', authenticateToken, (req, res) => {
 
         // return a list of all the employees
         employeeSchema.find({}, (err, employees) => {
@@ -23,7 +37,7 @@ module.exports = function(app){
     /* +===================================================+ */
     /*               Register a new employee                 */
     /* +===================================================+ */
-    app.post('/api/emp/employees', (req, res) => {
+    app.post('/api/emp/employees', authenticateToken, (req, res) => {
             
             // Create an object to be saved in the database
             const employee = new employeeSchema({
@@ -51,24 +65,25 @@ module.exports = function(app){
     /* +===================================================+ */
     /*             Get Employee By Employee ID               */
     /* +===================================================+ */
-    app.get('/api/emp/employees/:eid', (req, res) => {
+    app.get('/api/emp/employees/:eid', authenticateToken, (req, res) => {
 
         // check if the employee id is not empty
         if(!req.params.eid) {
-            return res.status(400).send({
+             res.status(400).send({
                 message: "Employee ID can not be empty"
             });
         } else {
-            // return employee profile by employee id
-            employeeSchema.findById(req.params.eid, (err, employee) => {
-                if (err) {
-                    return res.status(404).send({
-                        message: 'Employee not found with id ' + req.params.eid
-                    });
-                } else {
-                    res.send(employee);
+            // check if employee exists, then return the employee
+            employeeSchema.findOne({_id: req.params.eid}, (err, employee) => {
+                    if (employee) {
+                        res.send(employee);
+                    } else {
+                        res.status(404).send({
+                            message: "Employee not found with id " + req.params.eid
+                        });
+                    }
                 }
-            });
+            );
         }
         
     });
@@ -76,11 +91,11 @@ module.exports = function(app){
     /* +===================================================+ */
     /*            Update Employee By Employee ID             */
     /* +===================================================+ */
-    app.put('/api/emp/employees/:eid', (req, res) => {
+    app.put('/api/emp/employees/:eid', authenticateToken, (req, res) => {
 
         // check if the employee id is not empty
         if (!req.params.eid) {
-            return res.status(400).send({
+            res.status(400).send({
                 message: "Employee ID can not be empty"
             });
         } else {
@@ -98,28 +113,30 @@ module.exports = function(app){
                             message: "Employee not found with id " + req.params.eid
                         });
                     }
+                    // return the updated employee
                     res.send(employee);
                 }).catch(err => {
                     if (err.kind === 'ObjectId') {
                         return res.status(404).send({
                             message: "Employee not found with id " + req.params.eid
                         });
+                    } else {
+                        return res.status(500).send({
+                            message: "Error updating employee with id " + req.params.eid
+                        });
                     }
-                    return res.status(500).send({
-                        message: "Error updating employee with id " + req.params.eid
-                    });
                 });
         }
     });
 
     /* +===================================================+ */
-    /*            Delete Employee By Employee ID get query parameter             */
+    /*  Delete Employee By Employee ID get query parameter   */
     /* +===================================================+ */
-    app.delete('/api/emp/employees', (req, res) => {
+    app.delete('/api/emp/employees', authenticateToken, (req, res) => {
             
         // check if the employee id is not empty
         if (!req.query.eid) {
-            return res.status(400).send({
+            res.status(400).send({
                 message: "Employee ID can not be empty"
             });
         } else {
@@ -127,22 +144,24 @@ module.exports = function(app){
             employeeSchema.findByIdAndRemove(req.query.eid)
                 .then(employee => {
                     if (!employee) {
-                        return res.status(404).send({
+                        res.status(404).send({
                             message: "Employee not found with id " + req.query.eid
                         });
+                    } else {
+                        res.send({
+                            message: "Employee deleted successfully!"
+                        });
                     }
-                    res.send({
-                        message: "Employee deleted successfully!"
-                    });
                 }).catch(err => {
                     if (err.kind === 'ObjectId' || err.name === 'NotFound') {
-                        return res.status(404).send({
+                        res.status(404).send({
                             message: "Employee not found with id " + req.query.eid
                         });
+                    } else {
+                        res.status(500).send({
+                            message: "Could not delete employee with id " + req.query.eid
+                        });
                     }
-                    return res.status(500).send({
-                        message: "Could not delete employee with id " + req.query.eid
-                    });
                 });
         }
         
