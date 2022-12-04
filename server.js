@@ -1,6 +1,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors');
+
 const app = express();
+app.use(cors());
 
 const DB_URL = "mongodb+srv://root:IelABEKx2vngLmP7@cluster0.aklsnoa.mongodb.net/comp3123_assigment1?retryWrites=true&w=majority"
 // app.use(bodyParser.urlencoded({ extended: true }))
